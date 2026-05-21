@@ -20,7 +20,7 @@
 
 > All applications have been manually converted and verified by experienced developers.
 
-**Resources:** [Quickstart](https://scarfbench.info/quickstart/) · [Installation](https://scarfbench.info/installation/) · [Building an Agent](https://scarfbench.info/agent/) · [Leaderboard](https://scarfbench.info/leaderboard/) · [Submit Results](https://scarfbench.info/submit/)
+**Resources:** [Quickstart](https://scarfbench.info/quickstart/) · [Installation](https://scarfbench.info/installation/) · [Building an Agent](https://scarfbench.info/agent/) · [Leaderboard](https://scarfbench.info/leaderboard/) · [Submit Results](https://scarfbench.info/submit/) · [ArXiv Paper](https://arxiv.org/pdf/2605.06754) · [Hugging Face Dataset Card](https://huggingface.co/datasets/ibm-research/ScarfBench) 
 
 ---
 
