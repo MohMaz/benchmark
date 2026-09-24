@@ -33,5 +33,16 @@ checks league/team/player creation, the player-team relationship, salary and
 sport queries, deletion, and the final 404. It is an example of the minimum
 shape needed for a SCARF-Mongo L2 stateful oracle.
 
+The second workflow exercises a different framework and UI shape:
+
+```bash
+experiments/db-backed-smoke/order-quarkus-workflow.sh
+```
+
+It packages and starts the Quarkus gold application, creates an order in H2,
+reads it back through the rendered order list, deletes it, and verifies that it
+is gone. Run these workflows with JDK 21 to match the benchmark Dockerfiles.
+
 The scripts require free localhost ports 8080, 8081, 8082, and 9080 for the
-negative control, and port 8080 for the roster workflow.
+negative control, port 8080 for the roster workflow, and port 8082 for the
+order workflow.
