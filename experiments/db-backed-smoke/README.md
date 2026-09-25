@@ -119,3 +119,10 @@ Two additional authored-test probes show that corpus readiness varies by app:
 - Coffee Shop Spring: 11 tests, 6 errors. Failures include missing
   `entityManagerFactory` test contexts and an invalid Mockito `doNothing` on a
   non-void method.
+
+All nine gold persistence variants (`address-book`, `order`, and `roster`
+crossed with Spring, Quarkus, and Jakarta) complete `mvn test` on JDK 21. This
+is mostly a compile-only signal: eight produce no Surefire XML and therefore
+run zero authored tests. Only roster Spring runs tests at that phase (2 tests,
+0 failures, 0 errors). The evaluator-owned workflows above provide the missing
+behavior and state coverage for the selected variants.
