@@ -87,6 +87,26 @@ official `v0.1.2` release archive, there are 102 `Dockerfile` and 102 `test.sh`
 files but no `Makefile`, `metadata.json`, `smoke.py`, or `smoke/` directory.
 That layout cannot be consumed directly by the current CLI validator, which
 copies a `Makefile`, `Dockerfile`, and smoke assets before invoking `make test`.
+The release asset `benchmark-v0.1.2.tar.gz` used for this audit has SHA-256
+`df80f269ec0b751e8e18b4cd90a2435a3c2cf194a240b227b7424584a6e3a9ea`.
+
+The released CLI `scarf 0.1.2` confirms the incompatibility in two ways:
+
+- `scarf bench list --layer persistence` prints an empty table because it
+  discovers applications only by finding a `Makefile`.
+- `scarf validate` can nevertheless exit 0 and print `Successfully validated`
+  against this release. With a candidate-owned `output/test.sh`, GNU Make's
+  implicit rule creates an executable `test` by running `cat test.sh >test`
+  and `chmod a+x test`; the evaluator script is never executed. The resulting
+  metadata is `compile_ok: UNK`, `deploy_ok: UNK`, `tests_passed: null`, with
+  failure category `unknown`.
+
+The validator should fail closed before invoking Make when the evaluator source
+does not provide its required `Makefile`, `Dockerfile`, `metadata.json`, and
+smoke assets. It should also check the child exit status, reject indeterminate
+compile/deploy/test outcomes, and reserve success wording for a determinate
+passing result. This guards against candidate-owned files and Make implicit
+rules accidentally becoming the oracle.
 
 The RealWorld Spring public check calls `/api/tags`, but its gold application
 serves `/tags`; running the public check against the gold app returns HTTP 401.
