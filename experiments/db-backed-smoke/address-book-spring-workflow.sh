@@ -2,7 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-app_dir="$repo_root/benchmark/persistence/address-book/spring"
+app_dir="${SCARF_ADDRESS_BOOK_APP_DIR:-$repo_root/benchmark/persistence/address-book/spring}"
+framework="${SCARF_ADDRESS_BOOK_FRAMEWORK:-spring}"
 maven_repo="${SCARF_M2_DIR:-/private/tmp/scarf-m2}"
 log_path="/private/tmp/scarf-address-book-spring-workflow.log"
 work_dir="$(mktemp -d /private/tmp/scarf-address-book.XXXXXX)"
@@ -21,9 +22,23 @@ trap cleanup EXIT INT TERM
 
 if [[ "${SCARF_ADDRESS_BOOK_SKIP_LAUNCH:-false}" != true ]]; then
   cd "$app_dir"
-  mvn -q -Dmaven.repo.local="$maven_repo" \
-    -Dspring-boot.run.arguments="--server.port=$port" \
-    spring-boot:run >"$log_path" 2>&1 &
+  case "$framework" in
+    spring)
+      mvn -q -Dmaven.repo.local="$maven_repo" \
+        -Dspring-boot.run.arguments="--server.port=$port" \
+        spring-boot:run >"$log_path" 2>&1 &
+      ;;
+    quarkus)
+      mvn -q -Dmaven.repo.local="$maven_repo" \
+        package -DskipTests >"$log_path" 2>&1
+      QUARKUS_HTTP_PORT="$port" \
+        java -jar target/quarkus-app/quarkus-run.jar >>"$log_path" 2>&1 &
+      ;;
+    *)
+      echo "unsupported Address Book framework: $framework" >&2
+      exit 2
+      ;;
+  esac
   app_pid=$!
 fi
 
@@ -39,6 +54,8 @@ if [[ "$ready" != true ]]; then
   tail -100 "$log_path" >&2
   exit 2
 fi
+echo 'SCARF_EVIDENCE_COMPILE_OK=true'
+echo 'SCARF_EVIDENCE_DEPLOY_OK=true'
 
 form_id() {
   sed -n 's/.*<form id="\([^"]*\)".*/\1/p' "$1" | head -1
@@ -51,7 +68,37 @@ view_state() {
 action_id() {
   local page="$1"
   local label="$2"
-  sed -n "s/.*{'\([^']*\)':'[^']*'}.*>${label}<.*/\1/p" "$page" | head -1
+  local action
+
+  action="$(sed -n "s/.*{'\([^']*\)':'[^']*'}.*>${label}<.*/\1/p" "$page" | head -1)"
+  if [[ -z "$action" ]]; then
+    action="$(sed -n "s/.*myfaces\.oam\.submitForm('[^']*','\([^']*\)').*>${label}<.*/\1/p" "$page" | head -1)"
+  fi
+  printf '%s\n' "$action"
+}
+
+# Mojarra renders a command component as a request parameter whose name and
+# value are the component id. MyFaces instead writes the component id to its
+# `${form}:_idcl` hidden field and includes `${form}_SUBMIT=1`. Keep the
+# evaluator-owned interaction at the JSF protocol boundary so both gold
+# framework implementations are tested by the same behavioral oracle.
+action_fields=()
+prepare_action_fields() {
+  local page="$1"
+  local form="$2"
+  local action="$3"
+
+  if grep -Fq 'myfaces.oam.submitForm' "$page"; then
+    action_fields=(
+      --data-urlencode "${form}_SUBMIT=1"
+      --data-urlencode "${form}:_idcl=${action}"
+    )
+  else
+    action_fields=(
+      --data-urlencode "${form}=${form}"
+      --data-urlencode "${action}=${action}"
+    )
+  fi
 }
 
 open_create_form() {
@@ -68,10 +115,10 @@ open_create_form() {
   action="$(action_id "$list_page" 'Create New Contact')"
   state="$(view_state "$list_page")"
   [[ -n "$form" && -n "$action" && -n "$state" ]]
+  prepare_action_fields "$list_page" "$form" "$action"
 
   curl -sS -c "$cookie_jar" -b "$cookie_jar" -X POST \
-    --data-urlencode "${form}=${form}" \
-    --data-urlencode "${action}=${action}" \
+    "${action_fields[@]}" \
     --data-urlencode "jakarta.faces.ViewState=${state}" \
     "$base_url/contact/List.xhtml" -o "$create_page"
 }
@@ -86,18 +133,19 @@ form="$(form_id "$create_page")"
 action="$(action_id "$create_page" 'Save')"
 state="$(view_state "$create_page")"
 [[ -n "$form" && -n "$action" && -n "$state" ]]
+prepare_action_fields "$create_page" "$form" "$action"
 curl -sS -c "$writer_cookie" -b "$writer_cookie" -X POST \
-  --data-urlencode "${form}=${form}" \
+  "${action_fields[@]}" \
   --data-urlencode "${form}:firstName=Ada" \
   --data-urlencode "${form}:lastName=Lovelace" \
   --data-urlencode "${form}:birthday=12/10/1815" \
   --data-urlencode "${form}:homePhone=206-555-0100" \
   --data-urlencode "${form}:mobilePhone=425-555-0101" \
   --data-urlencode "${form}:email=ada@scarf.test" \
-  --data-urlencode "${action}=${action}" \
   --data-urlencode "jakarta.faces.ViewState=${state}" \
   "$base_url/contact/Create.xhtml" -o "$created_page"
 grep -Fq 'Contact was successfully created.' "$created_page"
+echo 'SCARF_EVIDENCE_CASE_PASS=create'
 
 # A new browser session proves the row was persisted rather than left only in
 # the JSF session-scoped controller.
@@ -108,6 +156,7 @@ curl -sS -c "$reader_cookie" -b "$reader_cookie" \
 for expected in Ada Lovelace 206-555-0100 425-555-0101 ada@scarf.test; do
   grep -Fq ">$expected<" "$reader_list"
 done
+echo 'SCARF_EVIDENCE_CASE_PASS=independent-session-read'
 
 # The negative case must be rejected by application validation and must not
 # become a second database row.
@@ -119,15 +168,16 @@ open_create_form "$invalid_cookie" "$invalid_list" "$invalid_create"
 form="$(form_id "$invalid_create")"
 action="$(action_id "$invalid_create" 'Save')"
 state="$(view_state "$invalid_create")"
+prepare_action_fields "$invalid_create" "$form" "$action"
 curl -sS -c "$invalid_cookie" -b "$invalid_cookie" -X POST \
-  --data-urlencode "${form}=${form}" \
+  "${action_fields[@]}" \
   --data-urlencode "${form}:firstName=Invalid" \
   --data-urlencode "${form}:lastName=Email" \
   --data-urlencode "${form}:email=not-an-email" \
-  --data-urlencode "${action}=${action}" \
   --data-urlencode "jakarta.faces.ViewState=${state}" \
   "$base_url/contact/Create.xhtml" -o "$invalid_result"
 grep -Fq 'Not a valid email address.' "$invalid_result"
+echo 'SCARF_EVIDENCE_CASE_PASS=invalid-email-rejection'
 
 # Delete from the independently loaded list, then verify from yet another
 # session that no contact (valid or invalid) remains.
@@ -135,13 +185,14 @@ form="$(form_id "$reader_list")"
 action="$(action_id "$reader_list" 'Destroy')"
 state="$(view_state "$reader_list")"
 [[ -n "$form" && -n "$action" && -n "$state" ]]
+prepare_action_fields "$reader_list" "$form" "$action"
 deleted_page="$work_dir/deleted.html"
 curl -sS -c "$reader_cookie" -b "$reader_cookie" -X POST \
-  --data-urlencode "${form}=${form}" \
-  --data-urlencode "${action}=${action}" \
+  "${action_fields[@]}" \
   --data-urlencode "jakarta.faces.ViewState=${state}" \
   "$base_url/contact/List.xhtml" -o "$deleted_page"
 grep -Fq 'Contact was successfully deleted.' "$deleted_page"
+echo 'SCARF_EVIDENCE_CASE_PASS=delete'
 
 final_page="$work_dir/final.html"
 curl -sS "$base_url/contact/List.xhtml" -o "$final_page"
@@ -150,5 +201,6 @@ if grep -Eq 'Ada|Lovelace|not-an-email' "$final_page"; then
   echo 'deleted or invalid contact is still present' >&2
   exit 1
 fi
+echo 'SCARF_EVIDENCE_CASE_PASS=independent-empty-state'
 
-echo 'PASS: address-book Spring H2 create, independent read, validation, and deletion workflow'
+echo "PASS: address-book ${framework} H2 create, independent read, validation, and deletion workflow"

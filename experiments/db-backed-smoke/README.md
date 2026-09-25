@@ -52,6 +52,27 @@ or database is rejected. The versioned manifest is
 `address-book-oracle-v1.json`. This is deliberately a one-task pilot tuple, not
 a substitute for the still-unavailable public 1,331-test expert-oracle corpus.
 
+The same oracle can grade a prepared candidate workspace:
+
+```bash
+experiments/db-backed-smoke/validate-address-book-workspace.sh \
+  --work-dir /absolute/path/to/candidate \
+  --framework quarkus
+```
+
+The framework selects the evaluator-owned build/deploy adapter; it is never
+inferred from agent output. Spring and Quarkus gold variants must both pass the
+same five behavior/state cases before an agent treatment is run.
+
+The unmodified public Quarkus Address Book target fails the third case: its
+`Contact` entity omits the `NotNull`, `Past`, and `Pattern` constraints present
+in the Spring source, so `not-an-email` is persisted. This experiment branch
+restores those source-equivalent annotations in the Quarkus fixture and records
+the distinction explicitly: the public target is a failing baseline; the
+fork-local corrected target is the reference executor's behavior-equivalent
+fixture. The evaluator also supports both Mojarra and MyFaces command-submit
+protocols, so this result is not an artifact of the JSF implementation.
+
 ```bash
 experiments/db-backed-smoke/roster-spring-workflow.sh
 ```

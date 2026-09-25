@@ -10,7 +10,7 @@
   },
   "evaluator": {
     "owner": "AMP",
-    "entrypoint": "experiments/db-backed-smoke/validate-address-book-reference.sh",
+    "entrypoint": "experiments/db-backed-smoke/validate-address-book-workspace.sh",
     "result_format": "json",
     "evidence_contract": "scarf-v1"
   },
@@ -37,8 +37,8 @@
     }
   ],
   "known_scope": [
-    "This v1 tuple proves the Spring/H2 gold reference and the evaluator contract.",
-    "Candidate-workspace build and launch adapters are a separate gate.",
+    "This v1 tuple proves the Spring/H2 and Quarkus/H2 gold references through the same evaluator contract.",
+    "Candidate workspaces must declare their target framework to the build and launch adapter.",
     "MongoDB document-state equivalence is not part of this tuple."
   ]
 }
