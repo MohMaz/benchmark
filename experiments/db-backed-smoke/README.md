@@ -35,7 +35,22 @@ It creates a fully populated contact, verifies it from an independent browser
 session, rejects an invalid email, deletes the valid contact, and verifies from
 a third session that neither contact remains. This catches both missing
 persistence and missing validation while still treating the public UI as the
-system boundary.
+system boundary. It starts on port 18080 by default; override the port with
+`SCARF_ADDRESS_BOOK_PORT`.
+
+Gate 1 pins those checks as the AMP-owned
+`amp-scarf-address-book-l2-v1` oracle tuple:
+
+```bash
+experiments/db-backed-smoke/validate-address-book-reference.sh
+experiments/db-backed-smoke/address-book-oracle-negative-control.sh
+```
+
+The first command emits the JSON `scarf-v1` evidence consumed by the Inspect
+adapter. The second proves that an HTTP-200 static fake with no Java application
+or database is rejected. The versioned manifest is
+`address-book-oracle-v1.json`. This is deliberately a one-task pilot tuple, not
+a substitute for the still-unavailable public 1,331-test expert-oracle corpus.
 
 ```bash
 experiments/db-backed-smoke/roster-spring-workflow.sh
@@ -57,8 +72,9 @@ reads it back through the rendered order list, deletes it, and verifies that it
 is gone. Run these workflows with JDK 21 to match the benchmark Dockerfiles.
 
 The scripts require free localhost ports 8080, 8081, 8082, and 9080 for the
-negative control, port 8080 for the roster workflow, and port 8082 for the
-order workflow.
+corpus-wide negative control, port 18080 for the Address Book workflow, port
+18081 for its focused negative control, port 8080 for the roster workflow, and
+port 8082 for the order workflow.
 
 ## Reproduce a whole-application database workflow
 

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "oracle_id": "amp-scarf-address-book-l2-v1",
+  "task_id": "persistence/address-book",
+  "contract_level": "L2",
+  "benchmark": {
+    "repository": "https://github.com/scarfbench/benchmark",
+    "revision": "7c83756671f5297cf3576c813c52aa9fb956867f",
+    "reference_variant": "benchmark/persistence/address-book/spring"
+  },
+  "evaluator": {
+    "owner": "AMP",
+    "entrypoint": "experiments/db-backed-smoke/validate-address-book-reference.sh",
+    "result_format": "json",
+    "evidence_contract": "scarf-v1"
+  },
+  "cases": [
+    {
+      "id": "create-contact",
+      "assertion": "A valid contact can be created through the public JSF interface."
+    },
+    {
+      "id": "independent-session-read",
+      "assertion": "A new browser session observes every persisted field."
+    },
+    {
+      "id": "invalid-email",
+      "assertion": "An invalid email is rejected and never becomes a second row."
+    },
+    {
+      "id": "delete-contact",
+      "assertion": "The independently loaded contact can be deleted."
+    },
+    {
+      "id": "independent-empty-state",
+      "assertion": "A third browser session observes an empty durable state after deletion."
+    }
+  ],
+  "known_scope": [
+    "This v1 tuple proves the Spring/H2 gold reference and the evaluator contract.",
+    "Candidate-workspace build and launch adapters are a separate gate.",
+    "MongoDB document-state equivalence is not part of this tuple."
+  ]
+}

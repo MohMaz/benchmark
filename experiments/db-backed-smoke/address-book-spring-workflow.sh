@@ -6,17 +6,26 @@ app_dir="$repo_root/benchmark/persistence/address-book/spring"
 maven_repo="${SCARF_M2_DIR:-/private/tmp/scarf-m2}"
 log_path="/private/tmp/scarf-address-book-spring-workflow.log"
 work_dir="$(mktemp -d /private/tmp/scarf-address-book.XXXXXX)"
-base_url="http://localhost:8080"
+port="${SCARF_ADDRESS_BOOK_PORT:-18080}"
+base_url="${SCARF_ADDRESS_BOOK_BASE_URL:-http://localhost:${port}}"
 
-cd "$app_dir"
-mvn -q -Dmaven.repo.local="$maven_repo" spring-boot:run >"$log_path" 2>&1 &
-app_pid=$!
+app_pid=''
 cleanup() {
-  kill "$app_pid" 2>/dev/null || true
-  wait "$app_pid" 2>/dev/null || true
+  if [[ -n "$app_pid" ]]; then
+    kill "$app_pid" 2>/dev/null || true
+    wait "$app_pid" 2>/dev/null || true
+  fi
   rm -rf "$work_dir"
 }
 trap cleanup EXIT INT TERM
+
+if [[ "${SCARF_ADDRESS_BOOK_SKIP_LAUNCH:-false}" != true ]]; then
+  cd "$app_dir"
+  mvn -q -Dmaven.repo.local="$maven_repo" \
+    -Dspring-boot.run.arguments="--server.port=$port" \
+    spring-boot:run >"$log_path" 2>&1 &
+  app_pid=$!
+fi
 
 ready=false
 for _ in {1..45}; do
